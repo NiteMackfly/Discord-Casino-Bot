@@ -5,10 +5,28 @@ from typing import List, Tuple, Union
 
 import discord
 from discord.ext import commands
+from discord.ui import View, Button
 from modules.card import Card
 from modules.economy import Economy
 from modules.helpers import *
 from PIL import Image
+
+
+class BlackjackView(View):
+    def __init__(self, game):
+        super().__init__()
+        self.game = game
+        self.value = None
+
+    @discord.ui.button(label="Hit", style=discord.ButtonStyle.primary, emoji="🇭")
+    async def hit(self, interaction: discord.Interaction, button: Button):
+        self.value = "hit"
+        self.stop()
+
+    @discord.ui.button(label="Stand", style=discord.ButtonStyle.secondary, emoji="🇸")
+    async def stand(self, interaction: discord.Interaction, button: Button):
+        self.value = "stand"
+        self.stop()
 
 
 class Blackjack(commands.Cog):
@@ -100,28 +118,16 @@ class Blackjack(commands.Cog):
         player_score = self.calc_hand(player_hand)
         dealer_score = self.calc_hand(dealer_hand)
 
-        async def out_table(**kwargs) -> discord.Message:
-            """Sends a picture of the current table"""
+        async def out_table(**kwargs) -> Tuple[discord.Embed, discord.File]:
+            """Creates an embed and file for the current table"""
             self.output(ctx.author.id, dealer_hand, player_hand)
             embed = make_embed(**kwargs)
             file = discord.File(f"{ctx.author.id}.png", filename=f"{ctx.author.id}.png")
             embed.set_image(url=f"attachment://{ctx.author.id}.png")
-            msg: discord.Message = await ctx.reply(file=file, embed=embed)
-            return msg
-
-        def check(
-            reaction: discord.Reaction, user: Union[discord.Member, discord.User]
-        ) -> bool:
-            return all(
-                (
-                    str(reaction.emoji) in ("🇸", "🇭"),  # correct emoji
-                    user == ctx.author,  # correct user
-                    user != self.client.user,  # isn't the bot
-                    reaction.message == msg,  # correct message
-                )
-            )
+            return embed, file
 
         standing = False
+        msg = None
 
         while True:
             player_score = self.calc_hand(player_hand)
@@ -135,26 +141,25 @@ class Blackjack(commands.Cog):
                 self.economy.add_money(ctx.author.id, bet * -1)
                 result = ("Player busts", "lost")
                 break
-            msg = await out_table(
+
+            embed, file = await out_table(
                 title="Your Turn",
                 description=f"Your hand: {player_score}\n"
                 f"Dealer's hand: {dealer_score}",
             )
-            await msg.add_reaction("🇭")
-            await msg.add_reaction("🇸")
 
-            try:  # reaction command
-                reaction, _ = await self.client.wait_for(
-                    "reaction_add", timeout=60, check=check
-                )
-            except asyncio.TimeoutError:
-                await msg.delete()
+            view = BlackjackView(self)
+            if msg:
+                await msg.edit(embed=embed, attachments=[file], view=view)
+            else:
+                msg = await ctx.reply(file=file, embed=embed, view=view)
 
-            if str(reaction.emoji) == "🇭":
+            await view.wait()
+
+            if view.value == "hit":
                 player_hand.append(deck.pop())
-                await msg.delete()
                 continue
-            elif str(reaction.emoji) == "🇸":
+            elif view.value == "stand":
                 standing = True
                 break
 
@@ -187,11 +192,8 @@ class Blackjack(commands.Cog):
             if result[1] == "lost"
             else discord.Color.green() if result[1] == "won" else discord.Color.blue()
         )
-        try:
-            await msg.delete()
-        except:
-            pass
-        msg = await out_table(
+
+        embed, file = await out_table(
             title=result[0],
             color=color,
             description=(
@@ -199,8 +201,12 @@ class Blackjack(commands.Cog):
                 + f"Dealer's hand: {dealer_score}"
             ),
         )
+        if msg:
+            await msg.edit(embed=embed, attachments=[file], view=None)
+        else:
+            await ctx.reply(file=file, embed=embed)
         os.remove(f"./{ctx.author.id}.png")
 
 
-def setup(client: commands.Bot):
-    client.add_cog(Blackjack(client))
+async def setup(client: commands.Bot):
+    await client.add_cog(Blackjack(client))
