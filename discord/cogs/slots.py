@@ -17,9 +17,15 @@ class SlotView(View):
         self.bet = bet
         self.ctx = ctx
         self.value = None
+        self.user_id = ctx.author.id  # Store the user ID
 
     @discord.ui.button(label="REROLL", style=discord.ButtonStyle.primary)
     async def reroll(self, interaction: discord.Interaction, button: Button):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message(
+                "You are not authorized to use this button.", ephemeral=True
+            )
+            return
         await interaction.response.defer()
         self.value = "reroll"
         self.stop()
@@ -134,7 +140,7 @@ class Slots(commands.Cog):
                     try:
                         os.remove(fp)
                     except FileNotFoundError:
-                        pass  #
+                        pass
                     embed, file, fp = await play_slots(bet)
                     view = SlotView(self, bet, ctx)
                     await msg.delete()
@@ -148,7 +154,7 @@ class Slots(commands.Cog):
         try:
             os.remove(fp)
         except FileNotFoundError:
-            pass  #
+            pass
 
     @commands.command(
         brief=f"Purchase credits. Each credit is worth ${DEFAULT_BET}.",
