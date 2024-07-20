@@ -19,9 +19,15 @@ class RouletteView(View):
         self.bet = bet
         self.ctx = ctx
         self.value = None
+        self.user_id = ctx.author.id  # Store the user ID
 
     @discord.ui.button(label="Spin Again", style=discord.ButtonStyle.primary)
     async def spin_again(self, interaction: discord.Interaction, button: Button):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message(
+                "You are not authorized to use this button.", ephemeral=True
+            )
+            return
         await interaction.response.defer()
         self.value = "spin_again"
         self.stop()
@@ -89,6 +95,21 @@ class Roulette(commands.Cog):
         base_image = Image.new("RGBA", table.size, (0, 0, 0, 0))
         base_image.paste(table, (0, 0))
 
+        # Draw the result number on the image
+        draw = ImageDraw.Draw(base_image)
+        font = ImageFont.load_default()
+        text = str(result)
+        text_width, text_height = draw.textsize(text, font=font)
+        draw.text(
+            (
+                (base_image.width - text_width) / 2,
+                (base_image.height - text_height) / 2,
+            ),
+            text,
+            font=font,
+            fill=(255, 0, 0),
+        )
+
         return base_image
 
     @commands.command(
@@ -122,26 +143,7 @@ class Roulette(commands.Cog):
                 33,
                 35,
             ],
-            "b": [
-                2,
-                4,
-                6,
-                8,
-                10,
-                11,
-                13,
-                15,
-                17,
-                20,
-                22,
-                24,
-                26,
-                28,
-                29,
-                31,
-                33,
-                35,
-            ],
+            "b": [2, 4, 6, 8, 10, 11, 13, 15, 17, 20, 22, 24, 26, 28, 29, 31, 33, 35],
             "even": list(range(2, 37, 2)),
             "e": list(range(2, 37, 2)),
             "odd": list(range(1, 37, 2)),
@@ -206,7 +208,7 @@ class Roulette(commands.Cog):
             try:
                 os.remove(fp)
             except FileNotFoundError:
-                pass  #
+                pass
 
             await msg.delete()
             await ctx.invoke(self.roulette, bet=bet, choice=choice)
@@ -216,7 +218,7 @@ class Roulette(commands.Cog):
         try:
             os.remove(fp)
         except FileNotFoundError:
-            pass  #
+            pass
 
 
 async def setup(client: commands.Bot):
