@@ -1,9 +1,16 @@
 import random
+import os
 
+import discord
 from discord.ext import commands
 from discord.ext.commands.errors import BadArgument
 from modules.economy import Economy
-from modules.helpers import DEFAULT_BET, InsufficientFundsException
+from modules.helpers import (
+    DEFAULT_BET,
+    InsufficientFundsException,
+    make_embed,
+    ABS_PATH,
+)
 
 
 class Gambling(commands.Cog):
@@ -29,15 +36,44 @@ class Gambling(commands.Cog):
     )
     async def flip(self, ctx: commands.Context, choice: str, bet: int = DEFAULT_BET):
         self.check_bet(ctx, bet)
-        choices = {"h": True, "t": False}
+        choices = {"h": "Heads", "t": "Tails"}
         choice = choice.lower()[0]
         if choice in choices.keys():
-            if random.choice(list(choices.keys())) == choice:
-                await ctx.reply("You WON!")
+            result = random.choice(list(choices.keys()))
+            won = result == choice
+
+            if won:
                 self.economy.add_money(ctx.author.id, bet)
+                color = discord.Color.green()
+                title = "You Won!"
+                description = (
+                    f"The coin landed on **{choices[result]}**!\nYou won ${bet}."
+                )
             else:
-                await ctx.reply("You Lost...")
                 self.economy.add_money(ctx.author.id, bet * -1)
+                color = discord.Color.red()
+                title = "You Lost..."
+                description = (
+                    f"The coin landed on **{choices[result]}**.\nYou lost ${bet}."
+                )
+
+            embed = make_embed(title=title, description=description, color=color)
+            embed.add_field(name="Your Choice", value=choices[choice], inline=True)
+            embed.add_field(name="Result", value=choices[result], inline=True)
+            embed.add_field(
+                name="New Balance",
+                value=f"${self.economy.get_entry(ctx.author.id)[1]}",
+                inline=False,
+            )
+
+            # Add the coin image to the embed
+            image_path = os.path.join(
+                ABS_PATH, "modules", "ht", f"{choices[result].lower()}.png"
+            )
+            file = discord.File(image_path, filename=f"{choices[result].lower()}.png")
+            embed.set_image(url=f"attachment://{choices[result].lower()}.png")
+
+            await ctx.reply(embed=embed, file=file)
         else:
             raise BadArgument()
 
@@ -49,15 +85,33 @@ class Gambling(commands.Cog):
         self.check_bet(ctx, bet)
         choices = range(1, 7)
         if choice in choices:
-            if random.choice(choices) == choice:
-                await ctx.reply("YOU WON!")
+            result = random.choice(choices)
+            won = result == choice
+
+            if won:
                 self.economy.add_money(ctx.author.id, bet * 6)
+                color = discord.Color.green()
+                title = "You Won!"
+                description = f"The die landed on **{result}**!\nYou won ${bet * 6}."
             else:
-                await ctx.reply("You lost...")
                 self.economy.add_money(ctx.author.id, bet * -1)
+                color = discord.Color.red()
+                title = "You Lost..."
+                description = f"The die landed on **{result}**.\nYou lost ${bet}."
+
+            embed = make_embed(title=title, description=description, color=color)
+            embed.add_field(name="Your Choice", value=choice, inline=True)
+            embed.add_field(name="Result", value=result, inline=True)
+            embed.add_field(
+                name="New Balance",
+                value=f"${self.economy.get_entry(ctx.author.id)[1]}",
+                inline=False,
+            )
+
+            await ctx.reply(embed=embed)
         else:
             raise BadArgument()
 
 
-def setup(client: commands.Bot):
-    client.add_cog(Gambling(client))
+async def setup(client: commands.Bot):
+    await client.add_cog(Gambling(client))
