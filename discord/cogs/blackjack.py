@@ -13,56 +13,28 @@ from PIL import Image
 
 
 class BlackjackView(View):
-    def __init__(self, game):
-        super().__init__()
-        self.game = game
-        self.value = None
-
-    @discord.ui.button(label="Hit", style=discord.ButtonStyle.primary, emoji="🇭")
-    async def hit(self, interaction: discord.Interaction, button: Button):
-        if interaction.user.id != self.game.user_id:
-            await interaction.response.send_message(
-                "You are not authorized to use this button.", ephemeral=True
-            )
-            return
-        self.value = "hit"
-        self.stop()
-
-    @discord.ui.button(label="Stand", style=discord.ButtonStyle.secondary, emoji="🇸")
-    async def stand(self, interaction: discord.Interaction, button: Button):
-        if interaction.user.id != self.game.user_id:
-            await interaction.response.send_message(
-                "You are not authorized to use this button.", ephemeral=True
-            )
-            return
-        self.value = "stand"
-        self.stop()
-
-
-class BlackjackView(View):
     def __init__(self, game, user_id):
         super().__init__()
         self.game = game
-        self.user_id = user_id  # Store user_id for interaction checks
+        self.user_id = user_id
         self.value = None
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        """Ensure only the user who started the game can interact."""
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message(
+                "You are not allowed to use this button.", ephemeral=True
+            )
+            return False
+        return True
 
     @discord.ui.button(label="Hit", style=discord.ButtonStyle.primary, emoji="🇭")
     async def hit(self, interaction: discord.Interaction, button: Button):
-        if interaction.user.id != self.user_id:
-            await interaction.response.send_message(
-                "You are not authorized to use this button.", ephemeral=True
-            )
-            return
         self.value = "hit"
         self.stop()
 
     @discord.ui.button(label="Stand", style=discord.ButtonStyle.secondary, emoji="🇸")
     async def stand(self, interaction: discord.Interaction, button: Button):
-        if interaction.user.id != self.user_id:
-            await interaction.response.send_message(
-                "You are not authorized to use this button.", ephemeral=True
-            )
-            return
         self.value = "stand"
         self.stop()
 
@@ -72,7 +44,11 @@ class Blackjack(commands.Cog):
         self.client = client
         self.economy = Economy()
 
-    def check_bet(self, ctx: commands.Context, bet: int = DEFAULT_BET):
+    def check_bet(
+        self,
+        ctx: commands.Context,
+        bet: int = DEFAULT_BET,
+    ):
         bet = int(bet)
         if bet <= 0:
             raise commands.errors.BadArgument()
@@ -163,7 +139,6 @@ class Blackjack(commands.Cog):
         standing = False
         msg = None
 
-        view = BlackjackView(self, ctx.author.id)  # Pass user_id to view
         while True:
             player_score = self.calc_hand(player_hand)
             dealer_score = self.calc_hand(dealer_hand)
@@ -183,6 +158,7 @@ class Blackjack(commands.Cog):
                 f"Dealer's hand: {dealer_score}",
             )
 
+            view = BlackjackView(self, ctx.author.id)
             if msg:
                 await msg.edit(embed=embed, attachments=[file], view=view)
             else:
