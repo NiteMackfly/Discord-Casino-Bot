@@ -40,17 +40,18 @@ class GamblingHelpers(commands.Cog, name="General"):
         aliases=["credits", "m"],
     )
     async def money(self, ctx: commands.Context, user: discord.Member = None):
-        user = user.id if user else ctx.author.id
-        user = self.client.get_user(user)
+        user_id = user.id if user else ctx.author.id
+        user = self.client.get_user(user_id) or await self.client.fetch_user(user_id)
+
         profile = self.economy.get_entry(user.id)
         embed = make_embed(
             title=user.name,
             description=(
                 "**${:,}**".format(profile[1]) + "\n**{:,}** credits".format(profile[2])
             ),
-            footer=discord.Embed.Empty,
+            footer=None,
         )
-        embed.set_thumbnail(url=user.avatar_url)
+        embed.set_thumbnail(url=user.avatar.url)
         await ctx.reply(embed=embed)
 
     @commands.command(
@@ -58,17 +59,20 @@ class GamblingHelpers(commands.Cog, name="General"):
         usage="leaderboard",
         aliases=["top", "lb"],
     )
-    async def leaderboard(self, ctx):
+    async def leaderboard(self, ctx: commands.Context):
         entries = self.economy.top_entries(5)
         embed = make_embed(title="Leaderboard:", color=discord.Color.gold())
         for i, entry in enumerate(entries):
+            user = self.client.get_user(entry[0]) or await self.client.fetch_user(
+                entry[0]
+            )
             embed.add_field(
-                name=f"{i+1}. {self.client.get_user(entry[0]).name}",
+                name=f"{i+1}. {user.name}",
                 value="${:,}".format(entry[1]),
                 inline=False,
             )
         await ctx.reply(embed=embed)
 
 
-def setup(client: commands.Bot):
-    client.add_cog(GamblingHelpers(client))
+async def setup(client: commands.Bot):
+    await client.add_cog(GamblingHelpers(client))
