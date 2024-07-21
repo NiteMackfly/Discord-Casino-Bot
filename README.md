@@ -1,5 +1,5 @@
 # HOUSE-2
-PLEASE USE PYTHON 3.9 tested on. 
+PLEASE USE PYTHON 3.10.8 tested on. 
 
 to run:
 git clone [this rep]
