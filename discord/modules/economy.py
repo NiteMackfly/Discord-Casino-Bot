@@ -15,11 +15,9 @@ class Economy:
 
     def open(self):
         """Initializes the database"""
-        self.conn = sqlite3.connect("economy.db", timeout=30)  # Increased timeout
-        self.conn.execute("PRAGMA journal_mode=WAL;")  # Set journal mode to WAL
-        self.conn.execute(
-            "PRAGMA synchronous=NORMAL;"
-        )  # Set synchronous to NORMAL for better performance
+        self.conn = sqlite3.connect("economy.db", timeout=30)
+        self.conn.execute("PRAGMA journal_mode=WAL;")
+        self.conn.execute("PRAGMA synchronous=NORMAL;")
         self.cur = self.conn.cursor()
         self.cur.execute(
             """CREATE TABLE IF NOT EXISTS economy (
@@ -28,6 +26,10 @@ class Economy:
             credits INTEGER NOT NULL DEFAULT 0
         )"""
         )
+
+        # Check if kidneys column exists, if not, add it
+        if not self._check_kidneys_column_exists():
+            self._add_kidneys_column()
 
     def close(self):
         """Safely closes the database"""
@@ -57,9 +59,10 @@ class Economy:
 
         return wrapper
 
-    def get_entry(self, user_id: int) -> Entry:
+    def get_entry(self, user_id: int) -> Tuple[int, int, int, int]:
         self.cur.execute(
-            "SELECT * FROM economy WHERE user_id=:user_id", {"user_id": user_id}
+            "SELECT user_id, money, credits, COALESCE(kidneys, 2) as kidneys FROM economy WHERE user_id=:user_id",
+            {"user_id": user_id},
         )
         result = self.cur.fetchone()
         if result:
@@ -120,3 +123,31 @@ class Economy:
     def top_entries(self, n: int = 0) -> List[Entry]:
         self.cur.execute("SELECT * FROM economy ORDER BY money DESC")
         return self.cur.fetchmany(n) if n else self.cur.fetchall()
+
+    def _check_kidneys_column_exists(self):
+        self.cur.execute("PRAGMA table_info(economy)")
+        columns = [column[1] for column in self.cur.fetchall()]
+        return "kidneys" in columns
+
+    @_commit
+    def _add_kidneys_column(self):
+        self.cur.execute(
+            "ALTER TABLE economy ADD COLUMN kidneys INTEGER NOT NULL DEFAULT 2"
+        )
+        self.cur.execute("UPDATE economy SET kidneys = 2 WHERE kidneys IS NULL")
+
+    @_commit
+    def remove_kidney(self, user_id: int) -> Entry:
+        entry = self.get_entry(user_id)
+        if entry[3] > 0:
+            new_kidney_count = entry[3] - 1
+            self.set_kidneys(user_id, new_kidney_count)
+            self.add_money(user_id, 10000)
+        return self.get_entry(user_id)
+
+    @_commit
+    def set_kidneys(self, user_id: int, kidneys: int) -> Entry:
+        self.cur.execute(
+            "UPDATE economy SET kidneys=? WHERE user_id=?", (kidneys, user_id)
+        )
+        return self.get_entry(user_id)
