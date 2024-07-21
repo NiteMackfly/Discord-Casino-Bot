@@ -1,4 +1,5 @@
 import asyncio
+import io
 import os
 import random
 from typing import List, Tuple
@@ -85,7 +86,7 @@ class Roulette(commands.Cog):
         if bet > current:
             raise InsufficientFundsException(current, bet)
 
-    def create_roulette_image(self, result: int) -> Image.Image:
+    def create_roulette_image(self, result: int) -> io.BytesIO:
         # Load images
         table = Image.open(
             os.path.join(ABS_PATH, "modules/roulette/roulette_table.png")
@@ -99,7 +100,13 @@ class Roulette(commands.Cog):
         draw = ImageDraw.Draw(base_image)
         font = ImageFont.load_default()
         text = str(result)
-        text_width, text_height = draw.textsize(text, font=font)
+
+        # Change: Use textbbox instead of textsize
+        bbox = draw.textbbox((0, 0), text, font=font)  # Get bounding box of the text
+        text_width = bbox[2] - bbox[0]  # Calculate width from bbox
+        text_height = bbox[3] - bbox[1]  # Calculate height from bbox
+
+        # Draw the text on the image
         draw.text(
             (
                 (base_image.width - text_width) / 2,
@@ -109,8 +116,11 @@ class Roulette(commands.Cog):
             font=font,
             fill=(255, 0, 0),
         )
-
-        return base_image
+        # Save image to BytesIO object
+        img_byte_arr = io.BytesIO()
+        base_image.save(img_byte_arr, format="PNG")
+        img_byte_arr.seek(0)
+        return img_byte_arr
 
     @commands.command(
         brief="Play roulette\nBet must be greater than $0",
@@ -184,10 +194,8 @@ class Roulette(commands.Cog):
             title = "You Lost..."
             description = f"The ball landed on **{result}**.\nYou lost ${bet}."
 
-        # Create and save the roulette image
-        roulette_image = self.create_roulette_image(result)
-        fp = f"{ctx.author.id}_roulette.png"
-        roulette_image.save(fp)
+        # Create the roulette image in memory
+        img_byte_arr = self.create_roulette_image(result)
 
         embed = make_embed(title=title, description=description, color=color)
         embed.add_field(
@@ -196,29 +204,18 @@ class Roulette(commands.Cog):
             inline=False,
         )
 
-        file = discord.File(fp, filename=fp)
-        embed.set_image(url=f"attachment://{fp}")
+        file = discord.File(fp=img_byte_arr, filename="roulette_result.png")
+        embed.set_image(url="attachment://roulette_result.png")
 
         view = RouletteView(self, bet, ctx)
         msg = await ctx.reply(file=file, embed=embed, view=view)
+        del img_byte_arr, file
 
         await view.wait()
 
         if view.value == "spin_again":
-            try:
-                os.remove(fp)
-            except FileNotFoundError:
-                pass
-
             await msg.delete()
             await ctx.invoke(self.roulette, bet=bet, choice=choice)
-        else:
-            os.remove(fp)
-
-        try:
-            os.remove(fp)
-        except FileNotFoundError:
-            pass
 
 
 async def setup(client: commands.Bot):
