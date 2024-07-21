@@ -1,4 +1,5 @@
 import asyncio
+import io
 import os
 import random
 from typing import List, Tuple, Union
@@ -107,6 +108,13 @@ class Blackjack(commands.Cog):
                     sum += 1
         return sum
 
+    def output(self, *hands: Tuple[List[Card]]) -> io.BytesIO:
+        image = self.center(*map(self.hand_to_images, hands))
+        img_byte_arr = io.BytesIO()
+        image.save(img_byte_arr, format="PNG")
+        img_byte_arr.seek(0)
+        return img_byte_arr
+
     @commands.command(
         aliases=["bj"],
         brief="Play a simple game of blackjack.\nBet must be greater than $0",
@@ -130,10 +138,10 @@ class Blackjack(commands.Cog):
 
         async def out_table(**kwargs) -> Tuple[discord.Embed, discord.File]:
             """Creates an embed and file for the current table"""
-            self.output(ctx.author.id, dealer_hand, player_hand)
+            img_byte_arr = self.output(dealer_hand, player_hand)
             embed = make_embed(**kwargs)
-            file = discord.File(f"{ctx.author.id}.png", filename=f"{ctx.author.id}.png")
-            embed.set_image(url=f"attachment://{ctx.author.id}.png")
+            file = discord.File(fp=img_byte_arr, filename="blackjack.png")
+            embed.set_image(url="attachment://blackjack.png")
             return embed, file
 
         standing = False
@@ -161,8 +169,10 @@ class Blackjack(commands.Cog):
             view = BlackjackView(self, ctx.author.id)
             if msg:
                 await msg.edit(embed=embed, attachments=[file], view=view)
+                del file
             else:
                 msg = await ctx.reply(file=file, embed=embed, view=view)
+                del file
 
             await view.wait()
 
@@ -213,9 +223,10 @@ class Blackjack(commands.Cog):
         )
         if msg:
             await msg.edit(embed=embed, attachments=[file], view=None)
+            del file
         else:
             await ctx.reply(file=file, embed=embed)
-        os.remove(f"./{ctx.author.id}.png")
+            del file
 
 
 async def setup(client: commands.Bot):
