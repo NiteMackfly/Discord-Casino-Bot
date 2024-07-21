@@ -1,6 +1,7 @@
 import bisect
 import os
 import random
+import io
 
 import discord
 from discord.ext import commands
@@ -87,13 +88,17 @@ class Slots(commands.Cog):
                 bg.alpha_composite(facade)
                 images.append(bg)
 
-            fp = str(id(ctx.author.id)) + ".gif"
-            images[0].save(
-                fp,
-                save_all=True,
-                append_images=images[1:],
-                duration=50,
-            )
+            with io.BytesIO() as image_binary:
+                images[0].save(
+                    image_binary,
+                    format="GIF",
+                    save_all=True,
+                    append_images=images[1:],
+                    duration=50,
+                    loop=0,
+                )
+                image_binary.seek(0)
+                file = discord.File(fp=image_binary, filename="slot_result.gif")
 
             result = ("lost", bet)
             self.economy.add_credits(ctx.author.id, bet * -1)
@@ -120,28 +125,24 @@ class Slots(commands.Cog):
                 ),
             )
 
-            file = discord.File(fp, filename=fp)
-            embed.set_image(url=f"attachment://{fp}")
+            embed.set_image(url="attachment://slot_result.gif")
 
-            return embed, file, fp
+            return embed, file
 
         async def send_slot_result(embed, file, view, mention=False):
             content = f"<@{ctx.author.id}> Rerolled!" if mention else None
-            return await ctx.send(content=content, file=file, embed=embed, view=view)
+            return await ctx.reply(content=content, file=file, embed=embed, view=view)
 
-        embed, file, fp = await play_slots(bet)
+        embed, file = await play_slots(bet)
         view = SlotView(self, bet, ctx)
         msg = await send_slot_result(embed, file, view)
+        del file
 
         while True:
             try:
                 await view.wait()
                 if view.value == "reroll":
-                    try:
-                        os.remove(fp)
-                    except FileNotFoundError:
-                        pass
-                    embed, file, fp = await play_slots(bet)
+                    embed, file = await play_slots(bet)
                     view = SlotView(self, bet, ctx)
                     await msg.delete()
                     msg = await send_slot_result(embed, file, view, mention=True)
@@ -150,11 +151,6 @@ class Slots(commands.Cog):
             except Exception as e:
                 print(f"An error occurred: {e}")
                 break
-
-        try:
-            os.remove(fp)
-        except FileNotFoundError:
-            pass
 
     @commands.command(
         brief=f"Purchase credits. Each credit is worth ${DEFAULT_BET}.",
