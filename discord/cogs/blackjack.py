@@ -1,8 +1,8 @@
-import asyncio
 import io
 import os
 import random
-from typing import List, Tuple, Union
+import asyncio
+from typing import List, Tuple
 
 import discord
 from discord.ext import commands
@@ -11,6 +11,7 @@ from modules.card import Card
 from modules.economy import Economy
 from modules.helpers import *
 from PIL import Image
+from modules.exceptions import ActiveGameError  # Adjust the import path as necessary
 
 
 class BlackjackView(View):
@@ -44,6 +45,12 @@ class Blackjack(commands.Cog):
     def __init__(self, client: commands.Bot):
         self.client = client
         self.economy = Economy()
+        self.active_players = set()
+
+    def cog_check(self, ctx):
+        if ctx.author.id in self.active_players:
+            raise ActiveGameError("You have an ongoing game. Please finish it first.")
+        return True
 
     def check_bet(
         self,
@@ -85,9 +92,6 @@ class Blackjack(commands.Cog):
             start_y += img_h + 15
         return bg
 
-    def output(self, name, *hands: Tuple[List[Card]]) -> None:
-        self.center(*map(self.hand_to_images, hands)).save(f"{name}.png")
-
     @staticmethod
     def calc_hand(hand: List[List[Card]]) -> int:
         """Calculates the sum of the card values and accounts for aces"""
@@ -121,112 +125,133 @@ class Blackjack(commands.Cog):
         usage=f"blackjack [bet- default=${DEFAULT_BET}]",
     )
     async def blackjack(self, ctx: commands.Context, bet: int = DEFAULT_BET):
-        self.check_bet(ctx, bet)
-        deck = [Card(suit, num) for num in range(2, 15) for suit in Card.suits]
-        random.shuffle(deck)  # Generate deck and shuffle it
-
-        player_hand: List[Card] = []
-        dealer_hand: List[Card] = []
-
-        player_hand.append(deck.pop())
-        dealer_hand.append(deck.pop())
-        player_hand.append(deck.pop())
-        dealer_hand.append(deck.pop().flip())
-
-        player_score = self.calc_hand(player_hand)
-        dealer_score = self.calc_hand(dealer_hand)
-
-        async def out_table(**kwargs) -> Tuple[discord.Embed, discord.File]:
-            """Creates an embed and file for the current table"""
-            img_byte_arr = self.output(dealer_hand, player_hand)
-            embed = make_embed(**kwargs)
-            file = discord.File(fp=img_byte_arr, filename="blackjack.png")
-            embed.set_image(url="attachment://blackjack.png")
-            return embed, file
-
-        standing = False
-        msg = None
-
-        while True:
-            player_score = self.calc_hand(player_hand)
-            dealer_score = self.calc_hand(dealer_hand)
-            if player_score == 21:  # win condition
-                bet = int(bet * 1.5)
-                self.economy.add_money(ctx.author.id, bet)
-                result = ("Blackjack!", "won")
-                break
-            elif player_score > 21:  # losing condition
-                self.economy.add_money(ctx.author.id, bet * -1)
-                result = ("Player busts", "lost")
-                break
-
-            embed, file = await out_table(
-                title="Your Turn",
-                description=f"Your hand: {player_score}\n"
-                f"Dealer's hand: {dealer_score}",
+        if ctx.author.id in self.active_players:
+            await ctx.send(
+                "You have an ongoing game. Please finish it first.", ephemeral=True
             )
+            return
 
-            view = BlackjackView(self, ctx.author.id)
-            if msg:
-                await msg.edit(embed=embed, attachments=[file], view=view)
-                del file
-            else:
-                msg = await ctx.reply(file=file, embed=embed, view=view)
-                del file
+        self.active_players.add(ctx.author.id)
 
-            await view.wait()
+        try:
+            self.check_bet(ctx, bet)
+            deck = [Card(suit, num) for num in range(2, 15) for suit in Card.suits]
+            random.shuffle(deck)  # Generate deck and shuffle it
 
-            if view.value == "hit":
-                player_hand.append(deck.pop())
-                continue
-            elif view.value == "stand":
-                standing = True
-                break
+            player_hand: List[Card] = []
+            dealer_hand: List[Card] = []
 
-        if standing:
-            dealer_hand[1].flip()
+            player_hand.append(deck.pop())
+            dealer_hand.append(deck.pop())
+            player_hand.append(deck.pop())
+            dealer_hand.append(deck.pop().flip())
+
             player_score = self.calc_hand(player_hand)
             dealer_score = self.calc_hand(dealer_hand)
 
-            while dealer_score < 17:  # dealer draws until 17 or greater
-                dealer_hand.append(deck.pop())
+            async def out_table(**kwargs) -> Tuple[discord.Embed, discord.File]:
+                """Creates an embed and file for the current table"""
+                img_byte_arr = self.output(dealer_hand, player_hand)
+                embed = make_embed(**kwargs)
+                file = discord.File(fp=img_byte_arr, filename="blackjack.png")
+                embed.set_image(url="attachment://blackjack.png")
+                return embed, file
+
+            standing = False
+            msg = None
+
+            while True:
+                player_score = self.calc_hand(player_hand)
+                dealer_score = self.calc_hand(dealer_hand)
+                if player_score == 21:  # win condition
+                    bet = int(bet * 1.5)
+                    self.economy.add_money(ctx.author.id, bet)
+                    result = ("Blackjack!", "won")
+                    break
+                elif player_score > 21:  # losing condition
+                    self.economy.add_money(ctx.author.id, bet * -1)
+                    result = ("Player busts", "lost")
+                    break
+
+                embed, file = await out_table(
+                    title="Your Turn",
+                    description=f"Your hand: {player_score}\n"
+                    f"Dealer's hand: {dealer_score}",
+                )
+
+                view = BlackjackView(self, ctx.author.id)
+                if msg:
+                    await msg.edit(embed=embed, attachments=[file], view=view)
+                    del file
+                else:
+                    msg = await ctx.reply(file=file, embed=embed, view=view)
+                    del file
+
+                try:
+                    await asyncio.wait_for(
+                        view.wait(), timeout=90.0
+                    )  # Timeout after 10 seconds
+                except asyncio.TimeoutError:
+                    view.value = "stand"  # Automatically stand after timeout
+
+                if view.value == "hit":
+                    player_hand.append(deck.pop())
+                    continue
+                elif view.value == "stand":
+                    standing = True
+                    break
+
+            if standing:
+                dealer_hand[1].flip()
+                player_score = self.calc_hand(player_hand)
                 dealer_score = self.calc_hand(dealer_hand)
 
-            if dealer_score == 21:  # winning/losing conditions
-                self.economy.add_money(ctx.author.id, bet * -1)
-                result = ("Dealer blackjack", "lost")
-            elif dealer_score > 21:
-                self.economy.add_money(ctx.author.id, bet)
-                result = ("Dealer busts", "won")
-            elif dealer_score == player_score:
-                result = ("Tie!", "kept")
-            elif dealer_score > player_score:
-                self.economy.add_money(ctx.author.id, bet * -1)
-                result = ("You lose!", "lost")
-            elif dealer_score < player_score:
-                self.economy.add_money(ctx.author.id, bet)
-                result = ("You win!", "won")
+                while dealer_score < 17:  # dealer draws until 17 or greater
+                    dealer_hand.append(deck.pop())
+                    dealer_score = self.calc_hand(dealer_hand)
 
-        color = (
-            discord.Color.red()
-            if result[1] == "lost"
-            else discord.Color.green() if result[1] == "won" else discord.Color.blue()
-        )
+                if dealer_score == 21:  # winning/losing conditions
+                    self.economy.add_money(ctx.author.id, bet * -1)
+                    result = ("Dealer blackjack", "lost")
+                elif dealer_score > 21:
+                    self.economy.add_money(ctx.author.id, bet)
+                    result = ("Dealer busts", "won")
+                elif dealer_score == player_score:
+                    result = ("Tie!", "kept")
+                elif dealer_score > player_score:
+                    self.economy.add_money(ctx.author.id, bet * -1)
+                    result = ("You lose!", "lost")
+                elif dealer_score < player_score:
+                    self.economy.add_money(ctx.author.id, bet)
+                    result = ("You win!", "won")
 
-        embed, file = await out_table(
-            title=result[0],
-            color=color,
-            description=(
-                f"**You {result[1]} ${bet}**\nYour hand: {player_score}\n"
-                + f"Dealer's hand: {dealer_score}"
-            ),
-        )
-        if msg:
-            await msg.edit(embed=embed, attachments=[file], view=None)
-            del file
-        else:
-            await ctx.reply(file=file, embed=embed)
-            del file
+            color = (
+                discord.Color.red()
+                if result[1] == "lost"
+                else (
+                    discord.Color.green()
+                    if result[1] == "won"
+                    else discord.Color.blue()
+                )
+            )
+
+            embed, file = await out_table(
+                title=result[0],
+                color=color,
+                description=(
+                    f"**You {result[1]} ${bet}**\nYour hand: {player_score}\n"
+                    + f"Dealer's hand: {dealer_score}"
+                ),
+            )
+            if msg:
+                await msg.edit(embed=embed, attachments=[file], view=None)
+                del file
+            else:
+                await ctx.reply(file=file, embed=embed)
+                del file
+
+        finally:
+            self.active_players.remove(ctx.author.id)
 
 
 async def setup(client: commands.Bot):
