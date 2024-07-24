@@ -2,6 +2,7 @@ import discord
 from discord.ext import commands
 from discord.ext.commands.errors import *
 from modules.helpers import PREFIX, InsufficientFundsException
+from modules.exceptions import ActiveGameError  # Adjust the import path as necessary
 
 
 class Handlers(commands.Cog, name="handlers"):
@@ -60,6 +61,9 @@ class Handlers(commands.Cog, name="handlers"):
             m = s // 60
             s %= 60
             await ctx.reply(f"{h}hrs {m}min {s}sec remaining.")
+
+        elif isinstance(error, ActiveGameError):
+            return
 
         else:
             raise error
