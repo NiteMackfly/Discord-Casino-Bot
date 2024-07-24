@@ -10,17 +10,18 @@ from discord.ui import View, Button
 from modules.economy import Economy
 from modules.helpers import *
 from PIL import Image
+from modules.exceptions import ActiveGameError
 
 
 class SlotView(View):
     def __init__(self, game, bet, ctx):
-        super().__init__()
+        super().__init__(timeout=30)
         self.game = game
         self.bet = bet
         self.ctx = ctx
         self.value = None
         self.user_id = ctx.author.id
-        self.message = None  # Store the message
+        self.message = None
 
     async def on_timeout(self) -> None:
         # Disable the button when the view times out
@@ -28,14 +29,16 @@ class SlotView(View):
             item.disabled = True
         await self.message.edit(view=self)
 
-    @discord.ui.button(label="REROLL", style=discord.ButtonStyle.primary)
-    async def reroll(self, interaction: discord.Interaction, button: Button):
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.user_id:
             await interaction.response.send_message(
                 "You are not authorized to use this button.", ephemeral=True
             )
-            return
-        # Remove the view entirely
+            return False
+        return True
+
+    @discord.ui.button(label="REROLL", style=discord.ButtonStyle.primary)
+    async def reroll(self, interaction: discord.Interaction, button: Button):
         await interaction.response.edit_message(view=None)
         self.value = "reroll"
         self.stop()
@@ -49,6 +52,12 @@ class Slots(commands.Cog):
     def __init__(self, client: commands.Bot):
         self.client = client
         self.economy = Economy()
+        self.active_players = set()
+
+    def cog_check(self, ctx):
+        if ctx.author.id in self.active_players:
+            raise ActiveGameError("You have an ongoing game. Please finish it first.")
+        return True
 
     def check_bet(self, ctx: commands.Context, bet: int = DEFAULT_BET):
         bet = int(bet)
@@ -64,6 +73,14 @@ class Slots(commands.Cog):
         aliases=["sl"],
     )
     async def slots(self, ctx: commands.Context, bet: int = 1):
+        if ctx.author.id in self.active_players:
+            await ctx.send(
+                "You have an ongoing game. Please finish it first.", ephemeral=True
+            )
+            return
+
+        self.active_players.add(ctx.author.id)
+
         async def play_slots(bet):
             self.check_bet(ctx, bet=bet)
             path = os.path.join(ABS_PATH, "modules/")
@@ -106,13 +123,11 @@ class Slots(commands.Cog):
                 bg.alpha_composite(facade)
                 images.append(bg)
 
-            # Create spinning animation
-            spinning_images = images[:-1]  # Exclude the last frame
+            spinning_images = images[:-1]
             spinning_file = self.create_optimized_gif(
                 spinning_images, duration=430, loop=True
             )
 
-            # Create result image
             result_image = images[-1]
             result_file = self.create_optimized_gif(
                 [result_image], duration=1000, loop=False
@@ -160,33 +175,34 @@ class Slots(commands.Cog):
 
         msg = await send_slot_result(spinning_embed, spinning_file)
 
-        # Wait for 7 seconds
         await asyncio.sleep(5)
 
-        # Edit message with result and add reroll button
         view = await SlotView(self, bet, ctx).start(msg)
         await msg.edit(embed=result_embed, attachments=[result_file], view=view)
+        self.active_players.remove(ctx.author.id)
 
         while True:
             try:
                 await view.wait()
                 if view.value == "reroll":
+                    if ctx.author.id in self.active_players:
+                        return
+
+                    self.active_players.add(ctx.author.id)
                     result_embed, spinning_file, result_file = await play_slots(bet)
 
-                    # Send spinning animation
                     spinning_embed.title = (
                         f"<@{ctx.author.id}> Rerolled! Spinning the slot machine..."
                     )
                     await msg.edit(embed=spinning_embed, attachments=[spinning_file])
 
-                    # Wait for 7 seconds
-                    await asyncio.sleep(7)
+                    await asyncio.sleep(5)
 
-                    # Edit message with result and add new reroll button
                     view = await SlotView(self, bet, ctx).start(msg)
                     await msg.edit(
                         embed=result_embed, attachments=[result_file], view=view
                     )
+                    self.active_players.remove(ctx.author.id)
                 else:
                     break
             except Exception as e:
