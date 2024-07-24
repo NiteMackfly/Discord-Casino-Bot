@@ -11,3 +11,5 @@ pip install -r requirements.txt
 cd discord
 
 python bot.py
+
+credits: https://github.com/ConnorSwis/casino-bot i used this person code as template to upgrade the casino bot. 
