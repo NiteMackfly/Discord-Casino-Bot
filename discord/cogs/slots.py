@@ -1,3 +1,4 @@
+import asyncio
 import bisect
 import os
 import random
@@ -18,7 +19,14 @@ class SlotView(View):
         self.bet = bet
         self.ctx = ctx
         self.value = None
-        self.user_id = ctx.author.id  # Store the user ID
+        self.user_id = ctx.author.id
+        self.message = None  # Store the message
+
+    async def on_timeout(self) -> None:
+        # Disable the button when the view times out
+        for item in self.children:
+            item.disabled = True
+        await self.message.edit(view=self)
 
     @discord.ui.button(label="REROLL", style=discord.ButtonStyle.primary)
     async def reroll(self, interaction: discord.Interaction, button: Button):
@@ -27,9 +35,14 @@ class SlotView(View):
                 "You are not authorized to use this button.", ephemeral=True
             )
             return
-        await interaction.response.defer()
+        # Remove the view entirely
+        await interaction.response.edit_message(view=None)
         self.value = "reroll"
         self.stop()
+
+    async def start(self, message):
+        self.message = message
+        return self
 
 
 class Slots(commands.Cog):
@@ -57,6 +70,11 @@ class Slots(commands.Cog):
             facade = Image.open(f"{path}slot-face.png").convert("RGBA")
             reel = Image.open(f"{path}slot-reel.png").convert("RGBA")
 
+            facade = facade.resize(
+                (facade.width // 2, facade.height // 2), Image.LANCZOS
+            )
+            reel = reel.resize((reel.width // 2, reel.height // 2), Image.LANCZOS)
+
             rw, rh = reel.size
             item = 180
             items = rh // item
@@ -79,7 +97,7 @@ class Slots(commands.Cog):
                 s3 = s3 - 6 if s3 == items else s3
 
             images = []
-            speed = 6
+            speed = 30
             for i in range(1, (item // speed) + 1):
                 bg = Image.new("RGBA", facade.size, color=(255, 255, 255))
                 bg.paste(reel, (25 + rw * 0, 100 - (speed * i * s1)))
@@ -88,17 +106,17 @@ class Slots(commands.Cog):
                 bg.alpha_composite(facade)
                 images.append(bg)
 
-            with io.BytesIO() as image_binary:
-                images[0].save(
-                    image_binary,
-                    format="GIF",
-                    save_all=True,
-                    append_images=images[1:],
-                    duration=50,
-                    loop=0,
-                )
-                image_binary.seek(0)
-                file = discord.File(fp=image_binary, filename="slot_result.gif")
+            # Create spinning animation
+            spinning_images = images[:-1]  # Exclude the last frame
+            spinning_file = self.create_optimized_gif(
+                spinning_images, duration=430, loop=True
+            )
+
+            # Create result image
+            result_image = images[-1]
+            result_file = self.create_optimized_gif(
+                [result_image], duration=1000, loop=False
+            )
 
             result = ("lost", bet)
             self.economy.add_credits(ctx.author.id, bet * -1)
@@ -108,7 +126,7 @@ class Slots(commands.Cog):
                 result = ("won", reward)
                 self.economy.add_credits(ctx.author.id, reward)
 
-            embed = make_embed(
+            result_embed = make_embed(
                 title=(
                     f"You {result[0]} {result[1]} credits"
                     + ("." if result[0] == "lost" else "!")
@@ -125,32 +143,70 @@ class Slots(commands.Cog):
                 ),
             )
 
-            embed.set_image(url="attachment://slot_result.gif")
+            result_embed.set_image(url="attachment://slot_result.gif")
 
-            return embed, file
+            return result_embed, spinning_file, result_file
 
-        async def send_slot_result(embed, file, view, mention=False):
-            content = f"<@{ctx.author.id}> Rerolled!" if mention else None
-            return await ctx.reply(content=content, file=file, embed=embed, view=view)
+        async def send_slot_result(embed, file, view=None):
+            return await ctx.reply(embed=embed, file=file, view=view)
 
-        embed, file = await play_slots(bet)
-        view = SlotView(self, bet, ctx)
-        msg = await send_slot_result(embed, file, view)
-        del file
+        result_embed, spinning_file, result_file = await play_slots(bet)
+
+        spinning_embed = make_embed(
+            title="Spinning the slot machine...", color=discord.Color.blue()
+        )
+
+        spinning_embed.set_image(url="attachment://slot_result.gif")
+
+        msg = await send_slot_result(spinning_embed, spinning_file)
+
+        # Wait for 7 seconds
+        await asyncio.sleep(5)
+
+        # Edit message with result and add reroll button
+        view = await SlotView(self, bet, ctx).start(msg)
+        await msg.edit(embed=result_embed, attachments=[result_file], view=view)
 
         while True:
             try:
                 await view.wait()
                 if view.value == "reroll":
-                    embed, file = await play_slots(bet)
-                    view = SlotView(self, bet, ctx)
-                    await msg.delete()
-                    msg = await send_slot_result(embed, file, view, mention=True)
+                    result_embed, spinning_file, result_file = await play_slots(bet)
+
+                    # Send spinning animation
+                    spinning_embed.title = (
+                        f"<@{ctx.author.id}> Rerolled! Spinning the slot machine..."
+                    )
+                    await msg.edit(embed=spinning_embed, attachments=[spinning_file])
+
+                    # Wait for 7 seconds
+                    await asyncio.sleep(7)
+
+                    # Edit message with result and add new reroll button
+                    view = await SlotView(self, bet, ctx).start(msg)
+                    await msg.edit(
+                        embed=result_embed, attachments=[result_file], view=view
+                    )
                 else:
                     break
             except Exception as e:
                 print(f"An error occurred: {e}")
                 break
+
+    def create_optimized_gif(self, images, duration, loop):
+        with io.BytesIO() as image_binary:
+            images[0].save(
+                image_binary,
+                format="GIF",
+                save_all=True,
+                append_images=images[1:],
+                duration=duration,
+                loop=loop,
+                optimize=True,
+                quality=10,
+            )
+            image_binary.seek(0)
+            return discord.File(fp=image_binary, filename="slot_result.gif")
 
     @commands.command(
         brief=f"Purchase credits. Each credit is worth ${DEFAULT_BET}.",
