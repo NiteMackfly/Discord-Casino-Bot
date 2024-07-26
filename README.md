@@ -18,6 +18,7 @@ Feel free to download and use for yourself!
 5. Configure [config.yml](config.yml)
 6. cd discord
 7. Run it (python bot.py)
+8. $help
 PLEASE USE PYTHON 3.10.8 tested on. 
 
 credits: https://github.com/ConnorSwis/casino-bot i used this person code as template to upgrade the casino bot. 
@@ -30,7 +31,7 @@ credits: https://github.com/ConnorSwis/casino-bot i used this person code as tem
 + ADDED A LOT OF GAME FUNCTIONALITIES TO ENSURE A RELIABLE BOT THAT HANDLES SPAM ETC...
 + UPGRADED FROM PYTHON 3.7.0 TO 3.10.8 TO SUPPORT DISCORD.PY==2.4.0
 + VARIOUS BUG FIXES
-+ FASTER DATABASE AND A COUPLE MORE INTERESTING COMMANDS SUCH AS .GIVE @USER AND @SELLKIDNEYS 
++ FASTER DATABASE AND A COUPLE MORE INTERESTING COMMANDS SUCH AS $GIVE @USER AND $SELLKIDNEYS 
   
 - BUGS THAT WERE FIXED 
 + DATABSE LOCK (INCREASED DATABASE DATA PROTECTION AND SPEED)
