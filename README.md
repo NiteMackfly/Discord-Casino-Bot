@@ -1,5 +1,5 @@
 # Casino Bot
-Casino bot is a gambling discord bot ConnorSwis made for his friends.
+Casino bot is a gambling discord bot by ConnorSwis made for his friends. Updated by me.
 
 It is able to play blackjack, slots, flip a coin, and roll dice. It stores everyone's money on an SQLite3 database.
 + roulette added
