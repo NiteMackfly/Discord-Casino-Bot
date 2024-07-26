@@ -62,9 +62,11 @@ class Slots(commands.Cog):
     def check_bet(self, ctx: commands.Context, bet: int = DEFAULT_BET):
         bet = int(bet)
         if bet <= 0 or bet > 3:
+            self.active_players.remove(ctx.author.id)
             raise commands.errors.BadArgument()
         current = self.economy.get_entry(ctx.author.id)[2]
         if bet > current:
+            self.active_players.remove(ctx.author.id)
             raise InsufficientFundsException(current, bet)
 
     @commands.command(
