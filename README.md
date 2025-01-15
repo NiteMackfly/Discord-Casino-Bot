@@ -52,7 +52,7 @@ A feature-rich Discord gambling bot with multiple casino games, originally creat
 
 3. Clone the repository:
    ```bash
-   git clone https://github.com/YourUsername/casino-bot.git
+   git clone https://github.com/plawandos/Discord-Casino-Bot.git
    cd casino-bot
    ```
 
