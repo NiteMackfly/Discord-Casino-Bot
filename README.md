@@ -15,7 +15,7 @@ Un bot de juegos de Discord repleto de funciones con múltiples juegos de casino
 
 </div>
 
-##✨ Características
+## ✨ Características
 
 - 🎮 Múltiples juegos de casino con botones interactivos
 - 💾 Base de datos SQLite3 persistente para saldos de usuarios
