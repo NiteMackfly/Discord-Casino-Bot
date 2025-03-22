@@ -8,7 +8,7 @@
 
 Un bot de juegos de Discord repleto de funciones con múltiples juegos de casino, creado originalmente por [ConnorSwis](https://github.com/ConnorSwis/casino-bot) y mejorado con nuevas funciones y mejoras.
 
-[Features](#features) • [Games](#available-games) • [Installation](#installation) • [Configuration](#configuration) • [Commands](#commands)
+[Características](#características) • [Juegos](#juegos-disponibles) • [Instalación](#instalación) • [Configuración](#configuración) • [Comandos](#comandos)
 
 <img src="https://raw.githubusercontent.com/ConnorSwis/casino-bot/main/pictures/blackjack.png" alt="Blackjack Screenshot" width="400"/>
 <img src="https://github.com/ConnorSwis/casino-bot/raw/main/pictures/slots.gif" alt="Slots Animation" width="200"/>
