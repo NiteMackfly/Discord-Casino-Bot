@@ -6,7 +6,7 @@
 [![Discord.py Version](https://img.shields.io/badge/discord.py-2.4.0-blue.svg)](https://discordpy.readthedocs.io/en/stable/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-A feature-rich Discord gambling bot with multiple casino games, originally created by [ConnorSwis](https://github.com/ConnorSwis/casino-bot) and enhanced with new features and improvements.
+Un bot de juegos de Discord repleto de funciones con múltiples juegos de casino, creado originalmente por [ConnorSwis](https://github.com/ConnorSwis/casino-bot) y mejorado con nuevas funciones y mejoras.
 
 [Features](#features) • [Games](#available-games) • [Installation](#installation) • [Configuration](#configuration) • [Commands](#commands)
 
