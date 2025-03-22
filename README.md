@@ -15,86 +15,53 @@ A feature-rich Discord gambling bot with multiple casino games, originally creat
 
 </div>
 
-## ✨ Features
+##✨ Características
 
-- 🎮 Multiple casino games with interactive buttons
-- 💾 Persistent SQLite3 database for user balances
-- 🚀 Enhanced performance and reliability
-- 🛡️ Improved error handling and spam protection
-- 🎯 Discord.py 2.4.0 support
-- ⚡ Fast response times and optimized database operations
+- 🎮 Múltiples juegos de casino con botones interactivos
+- 💾 Base de datos SQLite3 persistente para saldos de usuarios
+- 🚀 Rendimiento y fiabilidad mejorados
+- 🛡️ Gestión de errores y protección contra spam mejoradas
+- 🎯 Compatibilidad con Discord.py 2.4.0
+- ⚡ Tiempos de respuesta rápidos y operaciones de base de datos optimizadas
 
-## 🎲 Available Games
+## 🎲 Juegos disponibles
 
 - Blackjack
-- Slots
-- Coin Flip
-- Dice Roll
-- Roulette
-- And more!
+- Tragamonedas
+- Lanzamiento de moneda
+- Tirada de dados
+- Ruleta
+- ¡Y mucho más!
 
-## 📋 Requirements
+## 📋 Requisitos
 
-- Python 3.10.8 or higher
+- Python 3.10.8 o superior
 - Discord.py 2.4.0
 - SQLite3
-- Additional dependencies listed in `requirements.txt`
+- Dependencias adicionales listadas en `requirements.txt`
 
-## 🚀 Installation
+## 🔧 Actualizaciones recientes
 
-1. Create a new bot application on the [Discord Developer Portal](https://discord.com/developers)
+- ✅ Se añadió el juego de ruleta.
+- ✅ Se actualizó a Discord.py 2.4.0.
+- ✅ Se reemplazaron las reacciones con botones interactivos.
+- ✅ Se mejoró la protección antispam.
+- ✅ Se mejoró el rendimiento de la base de datos.
+- ✅ Se añadieron nuevos comandos (`$give @user`, `$sellkidneys`).
+- ✅ Se solucionaron problemas de bloqueo de la base de datos.
+- ✅ Se implementó una gestión robusta de errores.
 
-2. Install Python 3.10.8 or higher:
-   ```bash
-   # Download from https://python.org
-   python --version  # Verify installation
-   ```
+## 💬 Comandos
 
-3. Clone the repository:
-   ```bash
-   git clone https://github.com/plawandos/Discord-Casino-Bot.git
-   cd Discord-Casino-Bot
-   ```
+- `$help` - Mostrar todos los comandos disponibles.
+- `$balance` - Consultar tu saldo actual.
+- `$blackjack <cantidad>` - Jugar al blackjack.
+- `$slots <cantidad>` - Jugar a las tragamonedas.
+- `$roulette <cantidad> <apuesta>` - Jugar a la ruleta.
+- `$flip <cantidad> <elección>`. - Lanza una moneda
+- `$roll <cantidad> <número>` - Tira un dado
+- `$give @user <cantidad>` - Da dinero a otro usuario
 
-4. Install required dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-5. Configure the bot:
-   - Copy `config.example.yml` to `config.yml`
-   - Add your bot token and customize settings
-
-6. Launch the bot:
-   ```bash
-   cd discord
-   python bot.py
-   ```
-
-7. Use `$help` in Discord to see available commands
-
-## 🔧 Recent Upgrades
-
-- ✅ Added Roulette game
-- ✅ Upgraded to Discord.py 2.4.0
-- ✅ Replaced reactions with interactive buttons
-- ✅ Enhanced anti-spam protection
-- ✅ Improved database performance
-- ✅ Added new commands (`$give @user`, `$sellkidneys`)
-- ✅ Fixed database locking issues
-- ✅ Implemented robust error handling
-
-## 💬 Commands
-
-- `$help` - Display all available commands
-- `$balance` - Check your current balance
-- `$blackjack <amount>` - Play Blackjack
-- `$slots <amount>` - Play Slots
-- `$roulette <amount> <bet>` - Play Roulette
-- `$flip <amount> <choice>` - Flip a coin
-- `$roll <amount> <number>` - Roll dice
-- `$give @user <amount>` - Give money to another user
-- `$sellkidneys` - Get emergency funds (joke command)
 
 ## 🤝 Credits
 
